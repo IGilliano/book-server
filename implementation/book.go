@@ -3,7 +3,9 @@ package implementation
 import (
 	"book-server/service"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 
@@ -11,6 +13,7 @@ import (
 )
 
 type BookRequest struct {
+	ID        int    `json:"id"`
 	Name      string `json:"name"`
 	Author    string `json:"author"`
 	Publisher string `json:"publisher"`
@@ -20,11 +23,34 @@ type BookRequest struct {
 	Price     int    `json:"price"`
 }
 
+func ValidateBookRequest(r BookRequest) error {
+	if r.Name == "" {
+		return errors.New("Name is missing")
+	}
+	if r.Author == "" {
+		return errors.New("Author is missing")
+	}
+	if r.Publisher == "" {
+		return errors.New("Publisher is missing")
+	}
+	if r.Count == 0 {
+		return errors.New("Count is missing")
+	}
+	if r.Quantity == 0 {
+		return errors.New("Quantity is missing")
+	}
+	if r.Price == 0 {
+		return errors.New("Price is missing")
+	}
+	return nil
+}
+
 type IBookImplementation interface {
 	GetBooks(w http.ResponseWriter, r *http.Request)
 	GetBook(w http.ResponseWriter, r *http.Request)
 	PostBook(w http.ResponseWriter, r *http.Request)
 	DeleteBook(w http.ResponseWriter, r *http.Request)
+	UpdateBook(w http.ResponseWriter, r *http.Request)
 }
 
 type BookImplementation struct {
@@ -33,6 +59,19 @@ type BookImplementation struct {
 
 func NewBookImplementation(s service.IBookService) IBookImplementation {
 	return &BookImplementation{bookService: s}
+}
+
+func GetID(r *http.Request) int {
+	vars := mux.Vars(r)
+	id := vars["id"]
+	strid := id
+	intid := 0
+
+	_, err := fmt.Sscan(strid, &intid)
+	if err != nil {
+		fmt.Println(err)
+	}
+	return intid
 }
 
 func (i *BookImplementation) GetBooks(w http.ResponseWriter, r *http.Request) {
@@ -53,8 +92,7 @@ func (i *BookImplementation) GetBooks(w http.ResponseWriter, r *http.Request) {
 }
 
 func (i *BookImplementation) GetBook(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	id := vars["id"]
+	id := GetID(r)
 	book := i.bookService.GetBook(id)
 	bookByte, err := json.Marshal(book)
 	if err != nil {
@@ -72,29 +110,57 @@ func (i *BookImplementation) GetBook(w http.ResponseWriter, r *http.Request) {
 }
 
 func (i *BookImplementation) DeleteBook(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	id := vars["id"]
+	id := GetID(r)
 	i.bookService.DeleteBook(id)
+
 }
 
 func (i *BookImplementation) PostBook(w http.ResponseWriter, r *http.Request) {
 
-	var book service.BookRequest
-	jsonbookstring := `{"name": "Idiot", "author": "Dostoevskiy", "publisher": "AST", "quantity": 1, "is_new": true, "price": 399}`
-	fmt.Println(jsonbookstring)
-
-	err := json.Unmarshal([]byte(jsonbookstring), &book)
+	var book BookRequest
+	reqBody, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		fmt.Println("Panic is right here in implementation")
 		panic(err)
 	}
-	fmt.Println(book)
 
-	i.bookService.PostBook(book)
+	err = json.Unmarshal(reqBody, &book)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, newErr := w.Write([]byte(err.Error()))
+		if newErr != nil {
+			log.Println(newErr)
+		}
+	}
+	w.WriteHeader(http.StatusOK)
 
-	//resp, err := http.Post("http://localhost:8000", "application/json", bytes.NewBufferString(jsonbookstring))
-	//if err != nil {
-	//	panic(err)
-	//}
-	//fmt.Println(resp)
+	i.bookService.PostBook(FromBookRequestToBookForService(book, 0))
+}
+
+func FromBookRequestToBookForService(r BookRequest, id int) service.BookForService {
+	book := service.BookForService{
+		ID:        id,
+		Name:      r.Name,
+		Author:    r.Author,
+		Publisher: r.Publisher,
+		Count:     r.Count,
+		IsNew:     r.IsNew,
+		Price:     r.Price,
+	}
+	return book
+}
+
+func (i *BookImplementation) UpdateBook(w http.ResponseWriter, r *http.Request) {
+	var b BookRequest
+	id := GetID(r)
+
+	reqBody, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		panic(err)
+	}
+
+	err = json.Unmarshal(reqBody, &b)
+	if err != nil {
+		panic(err)
+	}
+	i.bookService.UpdateBook(FromBookRequestToBookForService(b, id))
 }
