@@ -21,9 +21,10 @@ type Book struct {
 
 type IBookRepository interface {
 	GetBooks() []*Book
-	GetBook(id string) []*Book
+	GetBook(id int) []*Book
 	PostBook(book Book)
-	DeleteBook(id string)
+	DeleteBook(id int)
+	UpdateBook(book Book)
 }
 
 type BookRepository struct {
@@ -55,16 +56,10 @@ func (b *BookRepository) GetBooks() []*Book {
 	return books
 }
 
-func (b *BookRepository) GetBook(id string) []*Book {
+func (b *BookRepository) GetBook(id int) []*Book {
 	var book []*Book
-	strid := id
-	intid := 0
-	_, err := fmt.Sscan(strid, &intid)
-	if err != nil {
-		fmt.Println(err)
-	}
-	fmt.Println(intid)
-	rows, err := b.db.Query("SELECT * FROM books WHERE id=$1", intid)
+
+	rows, err := b.db.Query("SELECT * FROM books WHERE id=$1", id)
 	if err != nil {
 		panic(err)
 	}
@@ -79,7 +74,7 @@ func (b *BookRepository) GetBook(id string) []*Book {
 	return book
 }
 
-func (b *BookRepository) DeleteBook(id string) {
+func (b *BookRepository) DeleteBook(id int) {
 	_, err := b.db.Exec("DELETE FROM books WHERE id = $1", id)
 	if err != nil {
 		panic(err)
@@ -87,11 +82,16 @@ func (b *BookRepository) DeleteBook(id string) {
 }
 
 func (b *BookRepository) PostBook(bk Book) {
-	fmt.Println(bk.Name, bk.Price)
-	res, err := b.db.Exec("INSERT INTO books (name, author, publisher, count, is_new, price, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7)", bk.Name, bk.Author, bk.Publisher, bk.Count, bk.IsNew, bk.Price, bk.CreatedAt)
-	if err != nil {
-		fmt.Println(err)
+	var id int
+	if err := b.db.QueryRow("INSERT INTO books (name, author, publisher, count, is_new, price, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id", bk.Name, bk.Author, bk.Publisher, bk.Count, bk.IsNew, bk.Price, bk.CreatedAt).Scan(&id); err != nil {
 		panic(err)
 	}
-	fmt.Println(res)
+	fmt.Println(id)
+}
+
+func (b *BookRepository) UpdateBook(bk Book) {
+	_, err := b.db.Exec("UPDATE books SET name = $1, author = $2, publisher = $3, count = $4, is_new = $5, price = $6, created_at = $7 WHERE id = $8", bk.Name, bk.Author, bk.Publisher, bk.Count, bk.IsNew, bk.Price, bk.CreatedAt, bk.Id)
+	if err != nil {
+		panic(err)
+	}
 }
