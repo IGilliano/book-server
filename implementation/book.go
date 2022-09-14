@@ -18,7 +18,6 @@ type BookRequest struct {
 	Author    string `json:"author"`
 	Publisher string `json:"publisher"`
 	Count     int    `json:"count"`
-	Quantity  int    `json:"quantity"`
 	IsNew     bool   `json:"is_new"`
 	Price     int    `json:"price"`
 }
@@ -35,9 +34,6 @@ func ValidateBookRequest(r BookRequest) error {
 	}
 	if r.Count == 0 {
 		return errors.New("Count is missing")
-	}
-	if r.Quantity == 0 {
-		return errors.New("Quantity is missing")
 	}
 	if r.Price == 0 {
 		return errors.New("Price is missing")
@@ -75,7 +71,7 @@ func GetID(r *http.Request) int {
 }
 
 func (i *BookImplementation) GetBooks(w http.ResponseWriter, r *http.Request) {
-	books := i.bookService.GetBooks()
+	books, err := i.bookService.GetBooks()
 	booksByte, err := json.Marshal(books)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -93,7 +89,7 @@ func (i *BookImplementation) GetBooks(w http.ResponseWriter, r *http.Request) {
 
 func (i *BookImplementation) GetBook(w http.ResponseWriter, r *http.Request) {
 	id := GetID(r)
-	book := i.bookService.GetBook(id)
+	book, err := i.bookService.GetBook(id)
 	bookByte, err := json.Marshal(book)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -102,6 +98,7 @@ func (i *BookImplementation) GetBook(w http.ResponseWriter, r *http.Request) {
 			log.Println(newErr)
 		}
 	}
+
 	w.WriteHeader(http.StatusOK)
 	_, errWrite := w.Write(bookByte)
 	if errWrite != nil {
@@ -112,7 +109,8 @@ func (i *BookImplementation) GetBook(w http.ResponseWriter, r *http.Request) {
 func (i *BookImplementation) DeleteBook(w http.ResponseWriter, r *http.Request) {
 	id := GetID(r)
 	i.bookService.DeleteBook(id)
-
+	w.WriteHeader(http.StatusOK)
+	fmt.Println("Book with id", id, "deleted\n")
 }
 
 func (i *BookImplementation) PostBook(w http.ResponseWriter, r *http.Request) {
@@ -120,7 +118,11 @@ func (i *BookImplementation) PostBook(w http.ResponseWriter, r *http.Request) {
 	var book BookRequest
 	reqBody, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		panic(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		_, newErr := w.Write([]byte(err.Error()))
+		if newErr != nil {
+			log.Println(newErr)
+		}
 	}
 
 	err = json.Unmarshal(reqBody, &book)
@@ -131,6 +133,13 @@ func (i *BookImplementation) PostBook(w http.ResponseWriter, r *http.Request) {
 			log.Println(newErr)
 		}
 	}
+
+	err = ValidateBookRequest(book)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
 	w.WriteHeader(http.StatusOK)
 
 	i.bookService.PostBook(FromBookRequestToBookForService(book, 0))
@@ -155,12 +164,23 @@ func (i *BookImplementation) UpdateBook(w http.ResponseWriter, r *http.Request) 
 
 	reqBody, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		panic(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		_, newErr := w.Write([]byte(err.Error()))
+		if newErr != nil {
+			log.Println(newErr)
+		}
 	}
 
 	err = json.Unmarshal(reqBody, &b)
 	if err != nil {
-		panic(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		_, newErr := w.Write([]byte(err.Error()))
+		if newErr != nil {
+			log.Println(newErr)
+		}
 	}
+	w.WriteHeader(http.StatusOK)
+	fmt.Println(b)
 	i.bookService.UpdateBook(FromBookRequestToBookForService(b, id))
+
 }

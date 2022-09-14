@@ -20,11 +20,11 @@ type Book struct {
 }
 
 type IBookRepository interface {
-	GetBooks() []*Book
-	GetBook(id int) []*Book
-	PostBook(book Book)
-	DeleteBook(id int)
-	UpdateBook(book Book)
+	GetBooks() ([]*Book, error)
+	GetBook(id int) ([]*Book, error)
+	PostBook(book Book) error
+	DeleteBook(id int) error
+	UpdateBook(book Book) error
 }
 
 type BookRepository struct {
@@ -39,59 +39,48 @@ func NewBookRepository() IBookRepository {
 	return &BookRepository{db: db}
 }
 
-func (b *BookRepository) GetBooks() []*Book {
+func (b *BookRepository) GetBooks() ([]*Book, error) {
 	var books []*Book
 	rows, err := b.db.Query("SELECT * FROM books")
-	if err != nil {
-		panic(err)
-	}
+
 	for rows.Next() {
 		var book Book
 		err = rows.Scan(&book.Id, &book.Name, &book.Author, &book.Publisher, &book.Count, &book.IsNew, &book.Price, &book.CreatedAt)
-		if err != nil {
-			panic(err)
+		if err == nil {
+			books = append(books, &book)
 		}
-		books = append(books, &book)
 	}
-	return books
+	return books, err
 }
 
-func (b *BookRepository) GetBook(id int) []*Book {
+func (b *BookRepository) GetBook(id int) ([]*Book, error) {
 	var book []*Book
 
 	rows, err := b.db.Query("SELECT * FROM books WHERE id=$1", id)
-	if err != nil {
-		panic(err)
-	}
+
 	for rows.Next() {
 		var bookscan Book
 		err = rows.Scan(&bookscan.Id, &bookscan.Name, &bookscan.Author, &bookscan.Publisher, &bookscan.Count, &bookscan.IsNew, &bookscan.Price, &bookscan.CreatedAt)
-		if err != nil {
-			panic(err)
+		if err == nil {
+			book = append(book, &bookscan)
 		}
-		book = append(book, &bookscan)
 	}
-	return book
+	return book, err
 }
 
-func (b *BookRepository) DeleteBook(id int) {
+func (b *BookRepository) DeleteBook(id int) error {
 	_, err := b.db.Exec("DELETE FROM books WHERE id = $1", id)
-	if err != nil {
-		panic(err)
-	}
+	return err
 }
 
-func (b *BookRepository) PostBook(bk Book) {
+func (b *BookRepository) PostBook(bk Book) error {
 	var id int
-	if err := b.db.QueryRow("INSERT INTO books (name, author, publisher, count, is_new, price, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id", bk.Name, bk.Author, bk.Publisher, bk.Count, bk.IsNew, bk.Price, bk.CreatedAt).Scan(&id); err != nil {
-		panic(err)
-	}
-	fmt.Println(id)
+	err := b.db.QueryRow("INSERT INTO books (name, author, publisher, count, is_new, price, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id", bk.Name, bk.Author, bk.Publisher, bk.Count, bk.IsNew, bk.Price, bk.CreatedAt).Scan(&id)
+	return err
 }
 
-func (b *BookRepository) UpdateBook(bk Book) {
+func (b *BookRepository) UpdateBook(bk Book) error {
+	fmt.Println(bk)
 	_, err := b.db.Exec("UPDATE books SET name = $1, author = $2, publisher = $3, count = $4, is_new = $5, price = $6, created_at = $7 WHERE id = $8", bk.Name, bk.Author, bk.Publisher, bk.Count, bk.IsNew, bk.Price, bk.CreatedAt, bk.Id)
-	if err != nil {
-		panic(err)
-	}
+	return err
 }
