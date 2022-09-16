@@ -6,21 +6,22 @@ import (
 	"time"
 )
 
-type BookRequest struct {
+type BookForService struct {
+	ID        int    `json:"id"`
 	Name      string `json:"name"`
 	Author    string `json:"author"`
 	Publisher string `json:"publisher"`
 	Count     int    `json:"count"`
-	Quantity  int    `json:"quantity"`
 	IsNew     bool   `json:"is_new"`
 	Price     int    `json:"price"`
 }
 
 type IBookService interface {
-	GetBooks() []*repository.Book
-	GetBook(id string) []*repository.Book
-	PostBook(book BookRequest)
-	DeleteBook(id string)
+	GetBooks() ([]*repository.Book, error)
+	GetBook(int) ([]*repository.Book, error)
+	PostBook(BookForService) error
+	DeleteBook(int) error
+	UpdateBook(BookForService) error
 }
 
 type BookService struct {
@@ -31,26 +32,27 @@ func NewBookService(r repository.IBookRepository) IBookService {
 	return &BookService{bookRepository: r}
 }
 
-func (s *BookService) GetBooks() []*repository.Book {
-	fmt.Printf("got /store request\n")
-	books := s.bookRepository.GetBooks()
-	return books
+func (s *BookService) GetBooks() ([]*repository.Book, error) {
+	fmt.Printf("got GET request\n")
+	books, err := s.bookRepository.GetBooks()
+	return books, err
 }
 
-func (s *BookService) GetBook(id string) []*repository.Book {
-	fmt.Println("got /store/<id> request\n")
-	book := s.bookRepository.GetBook(id)
-	return book
+func (s *BookService) GetBook(id int) ([]*repository.Book, error) {
+	fmt.Println("got GET ID request\n")
+	book, err := s.bookRepository.GetBook(id)
+	return book, err
 }
 
-func (s *BookService) DeleteBook(id string) {
-	fmt.Println("got /delete request\n")
-	s.bookRepository.DeleteBook(id)
+func (s *BookService) DeleteBook(id int) error {
+	fmt.Println("got DELETE request\n")
+	err := s.bookRepository.DeleteBook(id)
+	return err
 }
 
-func FromRequestToBook(r BookRequest) repository.Book {
+func FromRequestToBook(r BookForService) repository.Book {
 	book := repository.Book{
-		Id:        0,
+		Id:        r.ID,
 		Name:      r.Name,
 		Author:    r.Author,
 		Publisher: r.Publisher,
@@ -62,7 +64,15 @@ func FromRequestToBook(r BookRequest) repository.Book {
 	return book
 }
 
-func (s *BookService) PostBook(book BookRequest) {
-	fmt.Println("got /post request\n")
-	s.bookRepository.PostBook(FromRequestToBook(book))
+func (s *BookService) PostBook(book BookForService) error {
+	fmt.Println("got POST request\n")
+	err := s.bookRepository.PostBook(FromRequestToBook(book))
+	return err
+}
+
+func (s *BookService) UpdateBook(book BookForService) error {
+	fmt.Println("got PUT request\n")
+	fmt.Println(book)
+	err := s.bookRepository.UpdateBook(FromRequestToBook(book))
+	return err
 }
